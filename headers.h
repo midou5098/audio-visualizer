@@ -7,9 +7,11 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
+#include <fftw3.h>
+#include <cmath>
 
 
-
+int sample_rate=44100,format=32,channels=1,buf_size=1024;
 
 
 
@@ -127,8 +129,51 @@ void uinter::handel(SDL_Event event,int* mode){
 }
 
 
+class audiocap{
+    private:
+    SDL_AudioDeviceID device;
+
+    public:
+        float buffer[1024];
+        float bars[50];
+        void startmic();
+        void processfft();
+        void callback(void* userdata,Uint8 stream,int len);
+        void mode1();
+        
+
+};
+
+void audiocap::startmic(){
+    SDL_AudioSpec want;
+    want.freq= 44100;
+    want.format   = AUDIO_F32;
+    want.channels = 1;
+    want.samples  = 1024;
+    want.callback = audiocap::callback;
+    want.userdata = this;
+
+    device=SDL_OpenAudioDevice(nullptr,-1,&want,nullptr,0);
+    SDL_PauseAudioDevice(device,0);
+
+}
 
 
+
+//peak
+void audiocap::callback(void* userdata,Uint8 stream,int len){
+    audiocap* self=(audiocap*)userdata;
+    float* samples = (float*)stream;
+    int count= len/sizeof(float);
+    for(int i=0;i<count;i++){
+        self->buffer[i]=samples[i];
+
+    }
+}
+
+void audiocap::processfft(){
+
+}
 
 
 
