@@ -122,7 +122,7 @@ void uinter::layout(int* mode){
             float h=cap.bars[i];
             if(h > 720) h = 720;
             if(h < 0)   h = 0;
-            SDL_Rect rect={xb,(int)(720-h),5,(int)(h)};
+            SDL_Rect rect={xb,(int)(720-h*0.3f),20,(int)(h)};
             SDL_Renderer* renderer=sdl.getrenderer();
             SDL_SetRenderDrawColor(renderer,0,0,0,255);
             SDL_RenderFillRect(renderer,&rect);
@@ -227,7 +227,8 @@ void audiocap::processfft(){
             sum+=sqrt(real*real+img*img);
         }
         float raw=sum/(bin_high- bin_low +1);
-        raw = log10f(raw + 150.0f) * 50.0f;
+        raw = log10f(raw + 5.0f) * 50.0f;
+        raw*=4.0f;
         bars[b]=bars[b]*0.8+raw*0.2f;
 
         }
