@@ -9,7 +9,7 @@
 #include <SDL2/SDL_image.h>
 #include <fftw3.h>
 #include <cmath>
-
+#include <algorithm>
 
 int sample_rate=44100,format=32,channels=1,buf_size=1024;
 
@@ -82,12 +82,13 @@ void SDLinit::drawbut(int x,int y,int w,int h,int r,int g,int b,const std::strin
 class audiocap{
     private:
     SDL_AudioDeviceID device;
-    fftw_plan plan;
+    fftw_plan plan=nullptr;
+    double* fftw_input=nullptr;
+    fftw_complex* fftw_output=nullptr;
     public:
         float buffer[1024];
         float bars[50];
-        double* fftw_input=fftw_alloc_real(1024);
-        fftw_complex* fftw_output=fftw_alloc_complex(513);
+        
         audiocap();
         void startmic();
         void processfft();
@@ -118,10 +119,14 @@ void uinter::layout(int* mode){
     }else if (*mode==1){
         int xb=50;
         for (int i=0;i<50;i++){
-            SDL_Rect rect={xb,(int)(720-cap.bars[i]/2),5,(int)cap.bars[i]};
+            float h=cap.bars[i];
+            if(h > 720) h = 720;
+            if(h < 0)   h = 0;
+            SDL_Rect rect={xb,(int)(720-h),5,(int)(h)};
             SDL_Renderer* renderer=sdl.getrenderer();
             SDL_SetRenderDrawColor(renderer,0,0,0,255);
             SDL_RenderFillRect(renderer,&rect);
+            xb+=24;
         }
     }
 }
@@ -138,6 +143,7 @@ void uinter::handel(SDL_Event event,int* mode){
             int mousey=event.button.y;
             if(checkmouse(mousex,mousey,150,550,150,300)){
                 *mode=1;
+                std::cout << "clicked at x=" << event.button.x << " y=" << event.button.y << std::endl;
             }else if (checkmouse(mousex,mousey,600,1000,150,300)){
                 *mode=2;
             }
@@ -158,23 +164,31 @@ void uinter::handel(SDL_Event event,int* mode){
 
 audiocap::audiocap(){
     memset(bars,0,sizeof(bars));
+    memset(buffer,0,sizeof(buffer));
+    fftw_input=fftw_alloc_real(1024);
+    fftw_output=fftw_alloc_complex(513);
 }
 void audiocap::startmic(){
-    SDL_AudioSpec want;
-    want.freq= 44100;
-    want.format   = AUDIO_F32;
-    want.channels = 1;
-    want.samples  = 1024;
-    want.callback = audiocap::callback;
-    want.userdata = this;
+    SDL_AudioSpec temp{};
+    temp.freq= 44100;
+    temp.format   = AUDIO_F32;
+    temp.channels = 1;
+    temp.samples  = 1024;
+    temp.callback = audiocap::callback;
+    temp.userdata = this;
     plan = fftw_plan_dft_r2c_1d(
             1024, 
             fftw_input,   
             fftw_output,  
             FFTW_ESTIMATE 
         );
-    device=SDL_OpenAudioDevice(nullptr,1,&want,nullptr,0);
+    device=SDL_OpenAudioDevice(nullptr,1,&temp,nullptr,0);
     SDL_PauseAudioDevice(device,0);
+    if(device == 0){
+        std::cout << "mic failed: " << SDL_GetError() << std::endl;
+    }else{
+        std::cout << "mic opened ok, device id: " << device << std::endl;
+    }
 
 }
 
@@ -185,30 +199,36 @@ void audiocap::callback(void* userdata,Uint8* stream,int len){
     audiocap* self=(audiocap*)userdata;
     float* samples = (float*)stream;
     int count= len/sizeof(float);
-    for(int i=0;i<count;i++){
+    for(int i=0;i<std::min(count, 1024);i++){
         self->buffer[i]=samples[i];
         
     }
 }
 
 void audiocap::processfft(){
+    if(!plan){return;}
     for(int i=0;i<1024;i++){
         double hann =0.5*(1.0-cos(2.0*M_PI*i/1023.0));
         fftw_input[i]=buffer[i]*hann;
-        }fftw_execute(plan);
-        for(int b=0;b<50;b++){
-            float low_freq=20.0*pow(1000.0f,float(b)/50.0f);
-            float high_freq=20.0*pow(1000.0f,float(b+1)/50.0f);
-            int bin_low= (int)(low_freq/43.0f);
-            int bin_high= (int)(high_freq/43.0f);
-            float sum=0;
-            for(int h=bin_low;h<=bin_high;h++){
-                double real=fftw_output[h][1];
-                double img=fftw_output[h][2];
-                sum+=sqrt(real*real+img*img);
-            }
-            float raw=sum/(bin_high- bin_low +1);
-            bars[b]=bars[b]*0.8+raw*0.2f;
+    }
+    fftw_execute(plan);
+    for(int b=0;b<50;b++){
+        float low_freq=20.0*pow(1000.0f,float(b)/50.0f);
+        float high_freq=20.0*pow(1000.0f,float(b+1)/50.0f);
+        int bin_low= (int)(low_freq/43.0f);
+        int bin_high= (int)(high_freq/43.0f);
+        bin_low  = std::max(1, std::min(bin_low,  512));
+        bin_high = std::max(1, std::min(bin_high, 512));
+        std::cout << "b=" << b << " bin_low=" << bin_low << " bin_high=" << bin_high << std::endl;
+        float sum=0;
+        for(int h=bin_low;h<=bin_high;h++){
+            double real=fftw_output[h][0];
+            double img=fftw_output[h][1];
+            sum+=sqrt(real*real+img*img);
+        }
+        float raw=sum/(bin_high- bin_low +1);
+        raw = log10f(raw + 150.0f) * 50.0f;
+        bars[b]=bars[b]*0.8+raw*0.2f;
 
         }
     }
