@@ -23,6 +23,7 @@ class SDLinit{
         SDL_Renderer* renderer;
         TTF_Font* font;
     public:
+        SDL_Renderer* getrenderer(){return renderer;}
         SDLinit(const std::string title,int w,int h);
         ~SDLinit();
         void clear();
@@ -78,14 +79,31 @@ void SDLinit::drawbut(int x,int y,int w,int h,int r,int g,int b,const std::strin
     SDL_DestroyTexture(tex);
     
 }
+class audiocap{
+    private:
+    SDL_AudioDeviceID device;
+    fftw_plan plan;
+    public:
+        float buffer[1024];
+        float bars[50];
+        double* fftw_input=fftw_alloc_real(1024);
+        fftw_complex* fftw_output=fftw_alloc_complex(513);
+        audiocap();
+        void startmic();
+        void processfft();
+        static void callback(void* userdata,Uint8* stream,int len);
+        void mode1();
+        
 
+};
 
 class uinter{
     private:
         SDLinit& sdl;
+        audiocap& cap;
          //  using 1 for live audio and 2 for file system
     public:
-        uinter(SDLinit& s):sdl(s){}
+        uinter(SDLinit& s,audiocap& c):sdl(s),cap(c){}
         void handel(SDL_Event event,int* mode);
         void layout(int* mode);
         bool checkmouse(int x,int y,int lx,int rx,int upy,int dwy);
@@ -97,6 +115,14 @@ void uinter::layout(int* mode){
         sdl.drawbut(600,150,400,150,245, 230, 211,"file?");
 
         
+    }else if (*mode==1){
+        int xb=50;
+        for (int i=0;i<50;i++){
+            SDL_Rect rect={xb,(int)(720-cap.bars[i]/2),5,(int)cap.bars[i]};
+            SDL_Renderer* renderer=sdl.getrenderer();
+            SDL_SetRenderDrawColor(renderer,0,0,0,255);
+            SDL_RenderFillRect(renderer,&rect);
+        }
     }
 }
 bool uinter::checkmouse(int x,int y,int lx,int rx,int upy,int dwy){
@@ -129,23 +155,7 @@ void uinter::handel(SDL_Event event,int* mode){
 }
 
 
-class audiocap{
-    private:
-    SDL_AudioDeviceID device;
-    fftw_plan plan;
-    public:
-        float buffer[1024];
-        float bars[50];
-        double* fftw_input=fftw_alloc_real(1024);
-        fftw_complex* fftw_output=fftw_alloc_complex(513);
-        audiocap();
-        void startmic();
-        void processfft();
-        static void callback(void* userdata,Uint8* stream,int len);
-        void mode1();
-        
 
-};
 audiocap::audiocap(){
     memset(bars,0,sizeof(bars));
 }
@@ -177,7 +187,7 @@ void audiocap::callback(void* userdata,Uint8* stream,int len){
     int count= len/sizeof(float);
     for(int i=0;i<count;i++){
         self->buffer[i]=samples[i];
-
+        
     }
 }
 

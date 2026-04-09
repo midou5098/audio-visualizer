@@ -6,11 +6,13 @@
 
 int main(){
     SDLinit sdl("fuckass visualizer" , 1280,720);
-    uinter uic(sdl);
+    audiocap cap;
+    uinter uic(sdl,cap);
     bool running =true;
     SDL_Event event;
     int mode=-1;
     while(running){
+        if (mode==1){cap.startmic();}
         while(SDL_PollEvent(&event)){
             if(event.type==SDL_QUIT){
                 running=false;
