@@ -132,18 +132,23 @@ void uinter::handel(SDL_Event event,int* mode){
 class audiocap{
     private:
     SDL_AudioDeviceID device;
-
+    fftw_plan plan;
     public:
         float buffer[1024];
         float bars[50];
+        double* fftw_input=fftw_alloc_real(1024);
+        fftw_complex* fftw_output=fftw_alloc_complex(513);
+        audiocap();
         void startmic();
         void processfft();
-        void callback(void* userdata,Uint8 stream,int len);
+        static void callback(void* userdata,Uint8* stream,int len);
         void mode1();
         
 
 };
-
+audiocap::audiocap(){
+    memset(bars,0,sizeof(bars));
+}
 void audiocap::startmic(){
     SDL_AudioSpec want;
     want.freq= 44100;
@@ -152,8 +157,13 @@ void audiocap::startmic(){
     want.samples  = 1024;
     want.callback = audiocap::callback;
     want.userdata = this;
-
-    device=SDL_OpenAudioDevice(nullptr,-1,&want,nullptr,0);
+    plan = fftw_plan_dft_r2c_1d(
+            1024, 
+            fftw_input,   
+            fftw_output,  
+            FFTW_ESTIMATE 
+        );
+    device=SDL_OpenAudioDevice(nullptr,1,&want,nullptr,0);
     SDL_PauseAudioDevice(device,0);
 
 }
@@ -161,7 +171,7 @@ void audiocap::startmic(){
 
 
 //peak
-void audiocap::callback(void* userdata,Uint8 stream,int len){
+void audiocap::callback(void* userdata,Uint8* stream,int len){
     audiocap* self=(audiocap*)userdata;
     float* samples = (float*)stream;
     int count= len/sizeof(float);
@@ -172,8 +182,27 @@ void audiocap::callback(void* userdata,Uint8 stream,int len){
 }
 
 void audiocap::processfft(){
+    for(int i=0;i<1024;i++){
+        double hann =0.5*(1.0-cos(2.0*M_PI*i/1023.0));
+        fftw_input[i]=buffer[i]*hann;
+        }fftw_execute(plan);
+        for(int b=0;b<50;b++){
+            float low_freq=20.0*pow(1000.0f,float(b)/50.0f);
+            float high_freq=20.0*pow(1000.0f,float(b+1)/50.0f);
+            int bin_low= (int)(low_freq/43.0f);
+            int bin_high= (int)(high_freq/43.0f);
+            float sum=0;
+            for(int h=bin_low;h<=bin_high;h++){
+                double real=fftw_output[h][1];
+                double img=fftw_output[h][2];
+                sum+=sqrt(real*real+img*img);
+            }
+            float raw=sum/(bin_high- bin_low +1);
+            bars[b]=bars[b]*0.8+raw*0.2f;
 
-}
+        }
+    }
+
 
 
 
