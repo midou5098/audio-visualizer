@@ -1,3 +1,4 @@
+//another "big" project , yet the same 32 seconds..
 #ifndef HEADERS_H
 #define HEADERS_H
 
@@ -256,3 +257,6 @@ void audiocap::processfft(){
 
 
 #endif
+
+
+//live versio nwas such a fuckery , especially the buffer guarding , learned to always check the things i create , bruh file verison is gonna be abeast
