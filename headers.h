@@ -1,10 +1,11 @@
-//another "big" project , yet the same 32 seconds..
+//another "big" project , yet the same 32 seconds of dopamine..
 #ifndef HEADERS_H
 #define HEADERS_H
 
 #include <vector>
 #include <iostream>
 #include <string>
+#include "portable-file-dialogs.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
@@ -146,7 +147,11 @@ void uinter::handel(SDL_Event event,int* mode){
                 *mode=1;
                 std::cout << "clicked at x=" << event.button.x << " y=" << event.button.y << std::endl;
             }else if (checkmouse(mousex,mousey,600,1000,150,300)){
-                *mode=2;
+                auto files = pfd::open_file("Select File", "",
+                                {"Media", "*.mp3",
+                                "All Files", "*"});
+                if(!files.result().empty()){
+                    *mode=2;}
             }
         }
     }
@@ -185,11 +190,7 @@ void audiocap::startmic(){
         );
     device=SDL_OpenAudioDevice(nullptr,1,&temp,nullptr,0);
     SDL_PauseAudioDevice(device,0);
-    if(device == 0){
-        std::cout << "mic failed: " << SDL_GetError() << std::endl;
-    }else{
-        std::cout << "mic opened ok, device id: " << device << std::endl;
-    }
+    
 
 }
 
@@ -228,7 +229,7 @@ void audiocap::processfft(){
             sum+=sqrt(real*real+img*img);
         }
         float raw=sum/(bin_high- bin_low +1);
-        raw = log10f(raw + 5.0f) * 50.0f;
+        raw = log10f(raw + 5.0f) * 70.0f;
         raw*=4.0f;
         bars[b]=bars[b]*0.8+raw*0.2f;
 
