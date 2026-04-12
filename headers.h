@@ -3,6 +3,7 @@
 #define HEADERS_H
 #define MINIMP3_IMPLEMENTATION
 #define MINIMP3_FLOAT_OUTPUT
+#include <SDL2/SDL_mixer.h>
 #include "minimp3_ex.h"
 #include <vector>
 #include <iostream>
@@ -42,6 +43,8 @@ SDLinit::SDLinit(const std::string title,int w,int h){
     window=SDL_CreateWindow(title.c_str(),SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,w,h,SDL_WINDOW_SHOWN);
     renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED);
     TTF_Init();
+    Mix_Init(MIX_INIT_MP3);
+    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
     font=TTF_OpenFont("font.ttf",50);
     
 
@@ -85,6 +88,8 @@ void SDLinit::drawbut(int x,int y,int w,int h,int r,int g,int b,const std::strin
 }
 class audiocap{
     private:
+    Uint32 start_time;
+    Mix_Music* music = NULL;
     SDL_AudioDeviceID device;
     fftw_plan plan=nullptr;
     double* fftw_input=nullptr;
@@ -210,6 +215,9 @@ class mp3file{
     int channels;
 };
 void audiocap::loadfile(std::string path){
+    music = Mix_LoadMUS(path.c_str());
+    Mix_PlayMusic(music,1);
+    start_time=SDL_GetTicks();
     mp3dec_init(&dec);
     mp3dec_load(&dec,path.c_str(),&wowa,NULL,NULL);
 
@@ -237,8 +245,8 @@ void audiocap::processfft(int mode){
             }
             fftw_execute(plan);
             for(int b=0;b<50;b++){
-                float low_freq=80.0*pow(250.0f,float(b)/50.0f);
-                float high_freq=80.0*pow(250.0f,float(b+1)/50.0f);
+                float low_freq=80.0*pow(25.0f,float(b)/50.0f);
+                float high_freq=80.0*pow(25.0f,float(b+1)/50.0f);
                 int bin_low= (int)(low_freq/43.0f);
                 int bin_high= (int)(high_freq/43.0f);
                 bin_low  = std::max(1, std::min(bin_low,  512));
@@ -261,14 +269,16 @@ void audiocap::processfft(int mode){
             
             if(header_pos>=(int)wowa.samples)return;
             if(!plan){return;}
+            Uint32 elapsed_ms = SDL_GetTicks() - start_time;
+            header_pos = (int)((elapsed_ms / 1000.0f) * wowa.hz * wowa.channels);
             for(int i=0;i<1024;i++){
                 double hann =0.5*(1.0-cos(2.0*M_PI*i/1023.0));
                 fftw_input[i]=wowa.buffer[header_pos+i]*hann;
             }
             fftw_execute(plan);
             for(int b=0;b<50;b++){
-                float low_freq=80.0*pow(250.0f,float(b)/50.0f);
-                float high_freq=80.0*pow(250.0f,float(b+1)/50.0f);
+                float low_freq=80.0*pow(25.0f,float(b)/50.0f);
+                float high_freq=80.0*pow(25.0f,float(b+1)/50.0f);
                 int bin_low= (int)(low_freq/43.0f);
                 int bin_high= (int)(high_freq/43.0f);
                 bin_low  = std::max(1, std::min(bin_low,  512));
@@ -287,7 +297,6 @@ void audiocap::processfft(int mode){
 
                 }
                 
-                header_pos=header_pos+1024;
 
             }
     }
