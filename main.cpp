@@ -26,7 +26,7 @@ int main(){
         }
         sdl.clear();
         if(mode==1){
-            cap.processfft();
+            cap.processfft(mode);
         }
         uic.layout(&mode);
         sdl.present();

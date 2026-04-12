@@ -91,8 +91,9 @@ class audiocap{
     fftw_complex* fftw_output=nullptr;
     float* file_samples;
     int file_sample_count;
-    int header_pos;
-    mp3dec_t* dec;
+    int header_pos=0;
+    mp3dec_t dec;
+    mp3dec_file_info_t wowa{};
     public:
         float buffer[1024];
         float bars[50];
@@ -100,7 +101,7 @@ class audiocap{
         audiocap();
         void startmic();
         void loadfile(std::string path);
-        void processfft();
+        void processfft(int mode);
         static void callback(void* userdata,Uint8* stream,int len);
         void mode1();
         
@@ -125,7 +126,7 @@ void uinter::layout(int* mode){
         sdl.drawbut(600,150,400,150,245, 230, 211,"file?");
 
         
-    }else if (*mode==1){
+    }else if (*mode==1 || *mode==2){
         int xb=50;
         for (int i=0;i<50;i++){
             float h=cap.bars[i];
@@ -181,6 +182,12 @@ audiocap::audiocap(){
     memset(buffer,0,sizeof(buffer));
     fftw_input=fftw_alloc_real(1024);
     fftw_output=fftw_alloc_complex(513);
+    plan = fftw_plan_dft_r2c_1d(
+            1024, 
+            fftw_input,   
+            fftw_output,  
+            FFTW_ESTIMATE 
+            );
 }
 void audiocap::startmic(){
     SDL_AudioSpec temp{};
@@ -190,12 +197,7 @@ void audiocap::startmic(){
     temp.samples  = 1024;
     temp.callback = audiocap::callback;
     temp.userdata = this;
-    plan = fftw_plan_dft_r2c_1d(
-            1024, 
-            fftw_input,   
-            fftw_output,  
-            FFTW_ESTIMATE 
-        );
+    
     device=SDL_OpenAudioDevice(nullptr,1,&temp,nullptr,0);
     SDL_PauseAudioDevice(device,0);
     
@@ -208,9 +210,8 @@ class mp3file{
     int channels;
 };
 void audiocap::loadfile(std::string path){
-    mp3dec_file_info_t* wowa;
-    mp3dec_init(dec);
-    mp3dec_load(dec,path.c_str(),wowa,NULL,NULL);
+    mp3dec_init(&dec);
+    mp3dec_load(&dec,path.c_str(),&wowa,NULL,NULL);
 
 
 }
@@ -226,34 +227,75 @@ void audiocap::callback(void* userdata,Uint8* stream,int len){
     }
 }
 
-void audiocap::processfft(){
-    if(!plan){return;}
-    for(int i=0;i<1024;i++){
-        double hann =0.5*(1.0-cos(2.0*M_PI*i/1023.0));
-        fftw_input[i]=buffer[i]*hann;
-    }
-    fftw_execute(plan);
-    for(int b=0;b<50;b++){
-        float low_freq=20.0*pow(1000.0f,float(b)/50.0f);
-        float high_freq=20.0*pow(1000.0f,float(b+1)/50.0f);
-        int bin_low= (int)(low_freq/43.0f);
-        int bin_high= (int)(high_freq/43.0f);
-        bin_low  = std::max(1, std::min(bin_low,  512));
-        bin_high = std::max(1, std::min(bin_high, 512));
-        std::cout << "b=" << b << " bin_low=" << bin_low << " bin_high=" << bin_high << std::endl;
-        float sum=0;
-        for(int h=bin_low;h<=bin_high;h++){
-            double real=fftw_output[h][0];
-            double img=fftw_output[h][1];
-            sum+=sqrt(real*real+img*img);
-        }
-        float raw=sum/(bin_high- bin_low +1);
-        raw = log10f(raw + 5.0f) * 70.0f;
-        raw*=4.0f;
-        bars[b]=bars[b]*0.8+raw*0.2f;
+void audiocap::processfft(int mode){
+    switch (mode){
+        case 1:
+            if(!plan){return;}
+            for(int i=0;i<1024;i++){
+                double hann =0.5*(1.0-cos(2.0*M_PI*i/1023.0));
+                fftw_input[i]=buffer[i]*hann;
+            }
+            fftw_execute(plan);
+            for(int b=0;b<50;b++){
+                float low_freq=20.0*pow(1000.0f,float(b)/50.0f);
+                float high_freq=20.0*pow(1000.0f,float(b+1)/50.0f);
+                int bin_low= (int)(low_freq/43.0f);
+                int bin_high= (int)(high_freq/43.0f);
+                bin_low  = std::max(1, std::min(bin_low,  512));
+                bin_high = std::max(1, std::min(bin_high, 512));
+                std::cout << "b=" << b << " bin_low=" << bin_low << " bin_high=" << bin_high << std::endl;
+                float sum=0;
+                for(int h=bin_low;h<=bin_high;h++){
+                    double real=fftw_output[h][0];
+                    double img=fftw_output[h][1];
+                    sum+=sqrt(real*real+img*img);
+                }
+                float raw=sum/(bin_high- bin_low +1);
+                raw = log10f(raw + 5.0f) * 70.0f;
+                raw*=4.0f;
+                bars[b]=bars[b]*0.8+raw*0.2f;
 
-        }
+                }
+                break;
+        case 2:
+            
+            if(header_pos>=(int)wowa.samples)return;
+            if(!plan){return;}
+            for(int i=0;i<1024;i++){
+                double hann =0.5*(1.0-cos(2.0*M_PI*i/1023.0));
+                fftw_input[i]=wowa.buffer[header_pos+i]*hann;
+            }
+            fftw_execute(plan);
+            for(int b=0;b<50;b++){
+                float low_freq=20.0*pow(1000.0f,float(b)/50.0f);
+                float high_freq=20.0*pow(1000.0f,float(b+1)/50.0f);
+                int bin_low= (int)(low_freq/43.0f);
+                int bin_high= (int)(high_freq/43.0f);
+                bin_low  = std::max(1, std::min(bin_low,  512));
+                bin_high = std::max(1, std::min(bin_high, 512));
+                std::cout << "b=" << b << " bin_low=" << bin_low << " bin_high=" << bin_high << std::endl;
+                float sum=0;
+                for(int h=bin_low;h<=bin_high;h++){
+                    double real=fftw_output[h][0];
+                    double img=fftw_output[h][1];
+                    sum+=sqrt(real*real+img*img);
+                }
+                float raw=sum/(bin_high- bin_low +1);
+                raw = log10f(raw + 5.0f) * 70.0f;
+                raw*=4.0f;
+                bars[b]=bars[b]*0.8+raw*0.2f;
+
+                }
+                header_pos=header_pos+1024;
+
+            }
     }
+
+
+
+
+
+    
 
 
 
