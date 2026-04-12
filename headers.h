@@ -246,7 +246,7 @@ void audiocap::processfft(int mode){
             fftw_execute(plan);
             for(int b=0;b<50;b++){
                 float low_freq=80.0*pow(25.0f,float(b)/50.0f);
-                float high_freq=80.0*pow(25.0f,float(b+1)/50.0f);
+                float high_freq=80.5*pow(25.0f,float(b+1)/50.0f);
                 int bin_low= (int)(low_freq/43.0f);
                 int bin_high= (int)(high_freq/43.0f);
                 bin_low  = std::max(1, std::min(bin_low,  512));
