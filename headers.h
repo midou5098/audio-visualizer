@@ -1,7 +1,9 @@
 //another "big" project , yet the same 32 seconds of dopamine..
 #ifndef HEADERS_H
 #define HEADERS_H
-
+#define MINIMP3_IMPLEMENTATION
+#define MINIMP3_FLOAT_OUTPUT
+#include "minimp3_ex.h"
 #include <vector>
 #include <iostream>
 #include <string>
@@ -87,12 +89,17 @@ class audiocap{
     fftw_plan plan=nullptr;
     double* fftw_input=nullptr;
     fftw_complex* fftw_output=nullptr;
+    float* file_samples;
+    int file_sample_count;
+    int header_pos;
+    mp3dec_t* dec;
     public:
         float buffer[1024];
         float bars[50];
         
         audiocap();
         void startmic();
+        void loadfile(std::string path);
         void processfft();
         static void callback(void* userdata,Uint8* stream,int len);
         void mode1();
@@ -151,6 +158,7 @@ void uinter::handel(SDL_Event event,int* mode){
                                 {"Media", "*.mp3",
                                 "All Files", "*"});
                 if(!files.result().empty()){
+                    cap.loadfile(files.result()[0]);
                     *mode=2;}
             }
         }
@@ -193,8 +201,19 @@ void audiocap::startmic(){
     
 
 }
+class mp3file{
+    float* buffer;
+    int samplenumber;
+    int sample_rate;
+    int channels;
+};
+void audiocap::loadfile(std::string path){
+    mp3dec_file_info_t* wowa;
+    mp3dec_init(dec);
+    mp3dec_load(dec,path.c_str(),wowa,NULL,NULL);
 
 
+}
 
 //peak
 void audiocap::callback(void* userdata,Uint8* stream,int len){
