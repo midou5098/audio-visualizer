@@ -25,11 +25,12 @@ int main(){
 
         }
         sdl.clear();
-        if(mode==1){
+
             cap.processfft(mode);
-        }
+
         uic.layout(&mode);
         sdl.present();
+        SDL_Delay(16);
     }
     return 0;
 }
