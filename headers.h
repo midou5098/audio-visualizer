@@ -137,6 +137,9 @@ void uinter::layout(int* mode){
         
     }else if (*mode==1 || *mode==2){
         int xb=50;
+        int w;
+        int h;
+        SDL_QueryTexture(icon,NULL,NULL,&w,&h);
         SDL_Rect rect={1000,50,200,200};
         SDL_RenderCopy(sdl.getrenderer(),icon,NULL,&rect);
         for (int i=0;i<50;i++){
