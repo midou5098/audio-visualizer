@@ -32,6 +32,7 @@ class SDLinit{
         TTF_Font* font;
     public:
         SDL_Renderer* getrenderer(){return renderer;}
+        TTF_Font* getfont(){return font;}
         SDLinit(const std::string title,int w,int h);
         ~SDLinit();
         void clear();
@@ -48,7 +49,7 @@ SDLinit::SDLinit(const std::string title,int w,int h){
     TTF_Init();
     Mix_Init(MIX_INIT_MP3);
     Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024);
-    font=TTF_OpenFont("font.ttf",50);
+    font=TTF_OpenFont("font.ttf",28);
     
 
 }
@@ -121,6 +122,7 @@ class uinter{
         SDLinit& sdl;
         audiocap& cap;
         SDL_Texture* icon;
+        std::string message;
          //  using 1 for live audio and 2 for file system
     public:
         uinter(SDLinit& s,audiocap& c):sdl(s),cap(c){}
@@ -140,7 +142,7 @@ void uinter::layout(int* mode){
         int w;
         int h;
         SDL_QueryTexture(icon,NULL,NULL,&w,&h);
-        SDL_Rect rect={1000,50,200,200};
+        SDL_Rect rect={1060,5,200,200};
         SDL_RenderCopy(sdl.getrenderer(),icon,NULL,&rect);
         for (int i=0;i<50;i++){
             float h=cap.bars[i];
@@ -152,6 +154,15 @@ void uinter::layout(int* mode){
             SDL_RenderFillRect(renderer,&rect);
             xb+=24;
         }
+        SDL_Color black = {0,0,0,255};
+        SDL_Surface* surf=TTF_RenderText_Solid(sdl.getfont(),message.c_str(),black);
+        int tw = surf->w;
+        int th = surf->h;
+        SDL_Texture* tex=SDL_CreateTextureFromSurface(sdl.getrenderer(),surf);
+        SDL_Rect re={40,200,tw,th};
+        SDL_RenderCopy(sdl.getrenderer(),tex,NULL,&re);
+        SDL_FreeSurface(surf);
+        SDL_DestroyTexture(tex);
     }
 }
 bool uinter::checkmouse(int x,int y,int lx,int rx,int upy,int dwy){
@@ -184,6 +195,15 @@ void uinter::handel(SDL_Event event,int* mode){
                     SDL_RWops* rw = SDL_RWFromMem((void*)data, size);
                     SDL_Surface* surf=IMG_Load_RW(rw,1);
                     icon=SDL_CreateTextureFromSurface(sdl.getrenderer(),surf);
+                    std::string segment;
+                    std::string last;
+                    std::stringstream ss(files.result()[0]);
+
+                    while(std::getline(ss, segment, '/')){
+                        last = segment;
+                    }
+                    message="playing : "+last;
+
                     *mode=2;
                 }
             }
