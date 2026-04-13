@@ -15,6 +15,9 @@
 #include <fftw3.h>
 #include <cmath>
 #include <algorithm>
+#include <taglib/mpegfile.h>
+#include <taglib/id3v2tag.h>
+#include <taglib/attachedpictureframe.h>
 
 int sample_rate=44100,format=32,channels=1,buf_size=1024;
 
@@ -117,6 +120,7 @@ class uinter{
     private:
         SDLinit& sdl;
         audiocap& cap;
+        SDL_Texture* icon;
          //  using 1 for live audio and 2 for file system
     public:
         uinter(SDLinit& s,audiocap& c):sdl(s),cap(c){}
@@ -133,6 +137,8 @@ void uinter::layout(int* mode){
         
     }else if (*mode==1 || *mode==2){
         int xb=50;
+        SDL_Rect rect={1000,50,200,200};
+        SDL_RenderCopy(sdl.getrenderer(),icon,NULL,&rect);
         for (int i=0;i<50;i++){
             float h=cap.bars[i];
             if(h > 720) h = 720;
@@ -165,7 +171,18 @@ void uinter::handel(SDL_Event event,int* mode){
                                 "All Files", "*"});
                 if(!files.result().empty()){
                     cap.loadfile(files.result()[0]);
-                    *mode=2;}
+                    TagLib::MPEG::File file((files.result()[0]).c_str());
+                    TagLib::ID3v2::Tag* tag = file.ID3v2Tag();
+                    TagLib::ID3v2::FrameList frame= tag->frameListMap()["APIC"];
+                    TagLib::ID3v2::AttachedPictureFrame* pic=static_cast<TagLib::ID3v2::AttachedPictureFrame*>(frame.front());
+                    TagLib::ByteVector imgd=pic->picture();
+                    const char* data=imgd.data();
+                    unsigned int size=imgd.size();
+                    SDL_RWops* rw = SDL_RWFromMem((void*)data, size);
+                    SDL_Surface* surf=IMG_Load_RW(rw,1);
+                    icon=SDL_CreateTextureFromSurface(sdl.getrenderer(),surf);
+                    *mode=2;
+                }
             }
         }
     }
